@@ -6,4 +6,5 @@ Quantum Neural Network Annealer
 **:warning: IN CONSTRUCTION :warning:**
 
 To run, use:
+> pip install -r requirements.txt 
 > python demo.py

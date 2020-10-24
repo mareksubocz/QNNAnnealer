@@ -1,0 +1,5 @@
+numpy==1.19.2
+pyqubo==1.0.7
+dwave_tabu==0.3.0
+dwave_system==1.2.1
+dwavebinarycsp[maxgap]==0.1.2
