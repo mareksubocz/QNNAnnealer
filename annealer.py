@@ -12,6 +12,7 @@ def get_qnn_bqm(layers: list, lagrange_propagation=1, stitch_kwargs = None):
 class Network:
     def __init__(self, layers: list):
         self.layers = layers
+        #FIXME: do poprawy inicjalizacja
         self.weights = [Array(
                     (np.random.rand(layers[i], layers[i+1]) * 2 - 1).tolist()
                 ) for i in range(len(layers)-1)]
@@ -64,6 +65,7 @@ class NeuralNetworkAnnealer:
 
         # values is output array at this point
         self.H += sum((values - expected)*(values - expected))
+        # * lagrange_propagation
 
 
     def get_bqm(self, stitch_kwargs = None, lagrange_propagation=1):

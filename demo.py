@@ -24,14 +24,13 @@ def start_annealing(layers: list, lagrange_propagation=1, qpu=False, stitch_kwar
     #         print(q, bqm.quadratic[q])
 
     # Run BQM and get the solution and the energy
-    sampleset = sampler.sample(bqm)
+    sampleset = sampler.sample(bqm, num_reads=1000)
     solution1 = sampleset.first.sample
     energy1 = sampleset.first.energy
 
     print("Nodes chosen ('layer_n.o'): ")
-
     pprint(solution1)
-    print("Solution's energy: ", energy1)
+    print("Solution energy: ", energy1)
 
     # Determine which nodes are involved
     # selected_nodes = [k for k, v in solution1.items() if v == 1 and not k.startswith('aux')]
