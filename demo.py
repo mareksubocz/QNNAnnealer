@@ -39,7 +39,7 @@ def start_annealing(layers: list, lagrange_propagation=1, qpu=False, stitch_kwar
     # pprint(selected_nodes, ' Energy ', energy1)
 
 if __name__ == "__main__":
-    layers = [2,5,2]
+    layers = [2,20,2]
     # qpu: use real qpu instead of local simulator
-    start_annealing(layers, lagrange_propagation=1, qpu=True)
+    start_annealing(layers, lagrange_propagation=1, qpu=False)
 
