@@ -2,11 +2,11 @@ import numpy as np
 import dwavebinarycsp
 from pyqubo import Binary, Array
 
-def get_qnn_bqm(layers: list, lagrange_propagation=1, stitch_kwargs = None):
+def get_qnn_bqm(layers: list, input_data, output_data, lagrange_propagation=1, stitch_kwargs = None):
     if stitch_kwargs is None:
         stitch_kwargs = {}
     annealer = NeuralNetworkAnnealer(layers)
-    return annealer.get_bqm(stitch_kwargs=stitch_kwargs, lagrange_propagation=lagrange_propagation)
+    return annealer.get_bqm(input_data, output_data, stitch_kwargs=stitch_kwargs, lagrange_propagation=lagrange_propagation)
 
 
 class Network:
@@ -31,12 +31,13 @@ class NeuralNetworkAnnealer:
         return f"{layer}_{num}"
 
 
-    def propagationConstraint(self, network: Network, anneal_inputs=False,
+    def propagationConstraint(self, network: Network, input_data,
+                              output_data, anneal_inputs=False,
                               lagrange = 1):
         # training data
         # TODO: pass training data by argument and process function in loop
-        values = Array([0,1])
-        expected = Array([1,0])
+        values = Array(input_data)
+        expected = Array(output_data)
 
         # forward propagation
         for layer_num, layer in enumerate(network.layers[:-1]):
@@ -59,6 +60,7 @@ class NeuralNetworkAnnealer:
                     x_var = H_vars[node]
 
                 qubit_values.append(x_var)
+            print(self.H_vars)
 
             values *= Array(qubit_values)
             values = values.dot(network.weights[layer_num])
@@ -68,8 +70,12 @@ class NeuralNetworkAnnealer:
         # * lagrange_propagation
 
 
-    def get_bqm(self, stitch_kwargs = None, lagrange_propagation=1):
-        self.propagationConstraint(self.network, lagrange=lagrange_propagation)
+    def get_bqm(self, input_trainig_data, output_training_data, stitch_kwargs = None, lagrange_propagation=1):
+        if len(input_trainig_data) != len(output_training_data):
+            print('Input and output training data length does not match')
+        for tinput, toutput in zip(input_trainig_data, output_training_data):
+            self.propagationConstraint(self.network, tinput, toutput,
+                                       lagrange=lagrange_propagation)
         self.model = self.H.compile()
         bqm = self.model.to_dimod_bqm()
         return bqm
