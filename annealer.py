@@ -1,39 +1,41 @@
 import numpy as np
-import dwavebinarycsp
 from pyqubo import Binary, Array
 
-def get_qnn_bqm(layers: list, input_data, output_data, lagrange_propagation=1, stitch_kwargs = None):
+
+def get_qnn_bqm(layers: list, input_data, output_data, lagrange_propagation=1,
+                stitch_kwargs=None):
     if stitch_kwargs is None:
         stitch_kwargs = {}
     annealer = NeuralNetworkAnnealer(layers)
-    return annealer.get_bqm(input_data, output_data, stitch_kwargs=stitch_kwargs, lagrange_propagation=lagrange_propagation)
+    return annealer.get_bqm(input_data, output_data,
+                            stitch_kwargs=stitch_kwargs,
+                            lagrange_propagation=lagrange_propagation)
 
 
 class Network:
     def __init__(self, layers: list):
         self.layers = layers
-        #FIXME: do poprawy inicjalizacja
+        # FIXME: do poprawy inicjalizacja
         self.weights = [Array(
-                    (np.random.rand(layers[i], layers[i+1]) * 2 - 1).tolist()
-                ) for i in range(len(layers)-1)]
-        #TODO: add bias?
+            (np.random.rand(layers[i], layers[i+1]) * 2 - 1).tolist()
+        ) for i in range(len(layers)-1)]
+        print(self.weights)
+        # TODO: add bias?
         # self.biases = [np.random.rand(s) for s in layers]
 
 
 class NeuralNetworkAnnealer:
     def __init__(self, layers):
-        self.H = 0 # initialize Hamiltonian
+        self.H = 0  # initialize Hamiltonian
         self.H_vars = set()
         self.network = Network(layers)
-
 
     def get_label(self, layer, num):
         return f"{layer}_{num}"
 
-
     def propagationConstraint(self, network: Network, input_data,
                               output_data, anneal_inputs=False,
-                              lagrange = 1):
+                              lagrange=1):
         # training data
         # TODO: pass training data by argument and process function in loop
         values = Array(input_data)
@@ -57,10 +59,9 @@ class NeuralNetworkAnnealer:
                     x_var = Binary(node)
                     self.H_vars.add(x_var)
                 else:
-                    x_var = H_vars[node]
+                    x_var = self.H_vars[node]
 
                 qubit_values.append(x_var)
-            print(self.H_vars)
 
             values *= Array(qubit_values)
             values = values.dot(network.weights[layer_num])
@@ -69,13 +70,13 @@ class NeuralNetworkAnnealer:
         self.H += sum((values - expected)*(values - expected))
         # * lagrange_propagation
 
-
-    def get_bqm(self, input_trainig_data, output_training_data, stitch_kwargs = None, lagrange_propagation=1):
+    def get_bqm(self, input_trainig_data, output_training_data,
+                stitch_kwargs=None, lagrange_propagation=1):
         if len(input_trainig_data) != len(output_training_data):
             print('Input and output training data length does not match')
         for tinput, toutput in zip(input_trainig_data, output_training_data):
             self.propagationConstraint(self.network, tinput, toutput,
                                        lagrange=lagrange_propagation)
         self.model = self.H.compile()
-        bqm = self.model.to_dimod_bqm()
+        bqm = self.model.to_bqm()
         return bqm

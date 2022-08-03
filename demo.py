@@ -4,16 +4,17 @@ from pprint import pprint
 
 from dwave.system.composites import EmbeddingComposite
 from dwave.system.samplers import DWaveSampler
-from dwavebinarycsp.exceptions import ImpossibleBQM
 
-def start_annealing(layers: list, input_data, output_data, lagrange_propagation=1, qpu=False, stitch_kwargs=None):
+
+def start_annealing(layers: list, input_data, output_data,
+                    lagrange_propagation=1, qpu=False, stitch_kwargs=None):
     if qpu:
-        sampler = EmbeddingComposite(
-            DWaveSampler(solver={'topology__type': 'pegasus', 'qpu': True}))
+        sampler = EmbeddingComposite(DWaveSampler())
     else:
         sampler = tabu.TabuSampler()
 
-    bqm = get_qnn_bqm(layers, input_data, output_data, lagrange_propagation, stitch_kwargs)
+    bqm = get_qnn_bqm(layers, input_data, output_data,
+                      lagrange_propagation, stitch_kwargs)
 
     # Check elements in the BQM
     # for q in bqm.linear:
@@ -37,15 +38,18 @@ def start_annealing(layers: list, input_data, output_data, lagrange_propagation=
     # from pprint import pprint
     # pprint(selected_nodes, ' Energy ', energy1)
 
+
 if __name__ == "__main__":
-    layers = [2,20,20,1]
+    layers = [2, 10, 1]
 
     # XOR function
-    input_data = [[1,0],[1,1],[0,1],[0,0]]
-    output_data = [[1],[0],[1],[0]]
+    input_data = [[1, 0], [1, 1], [0, 1], [0, 0]]
+    output_data = [[1], [0], [1], [0]]
+    # AND function
+    # input_data = [[1, 0], [1, 1], [0, 1], [0, 0]]
+    # output_data = [[0], [1], [0], [0]]
     # input_data = [[1,0]]
     # output_data = [[1]]
     # qpu: use real qpu instead of local simulator
     start_annealing(layers, input_data, output_data, lagrange_propagation=1,
                     qpu=False)
-
