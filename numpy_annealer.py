@@ -10,6 +10,9 @@ from pprint import pprint
 import matplotlib.pyplot as plt
 import numpy as np
 import pyqubo
+from dimod import BinaryQuadraticModel
+from dwave.system import DWaveSampler, EmbeddingComposite
+from neal import SimulatedAnnealingSampler
 
 def imshow(inp, title=None):
     """Imshow for Tensor."""
@@ -63,27 +66,25 @@ def forward_no_fc(model, x):
     return x
 
 
-def calculate_pyqubo(model, X, y):
+def calculate_pyqubo(model, outputs, expecteds):
     """
     Input: model and batch from dataloader.
     Add result from all images and call .compile().
     Make sure the last layer of the model is fully connected and named fc.
+
+    no bias for now
+
+    outputs: A
+    expecteds: Y'
+    model.fc.weights: W
     """
-    H = 0
-    # Extract one example from batch.
-    # for X, y in zip(images, labels):
-    # Calculate result before fully connected layer.
-    x = forward_no_fc(model, X)
-    for input, label in zip(x, y):
-        labels = np.zeros(10)
-        labels[label] = 1
-        # Assign a qubit to every of the layer.
-        x = np.array([pyqubo.Binary(f"{i}") * input[i] for i in range(len(input))])
-        # Calculate output in terms of QUBO.
-        y_pred = model.fc.weight.detach().numpy() @ x
-        # Add to hamiltonian after calculating squared error.
-        H += ((labels-y_pred)**2).sum()
-    return H
+    weights = model.fc.weight
+    Q = torch.zeros(model.fc.in_features, model.fc.in_features)
+    #TODO: check if any one value is correct
+    main_diagonal = (((outputs@weights.T) - 2*expecteds) @ weights).T @ outputs
+    #TODO: add values other than main diagonal
+    Q += torch.eye(model.fc.in_features)*main_diagonal
+    return BinaryQuadraticModel(Q, "BINARY")
 
 
 def anneal_loop(model, dataloader):
@@ -99,13 +100,14 @@ def anneal_loop(model, dataloader):
             images, labels = data
             a = forward_no_fc(model, images)
             outputs.extend(a)
-            expected = torch.eye(model.fc.out_features)[labels]
+            expected = torch.eye(model.fc.out_features)[labels]*5
             expecteds.extend(expected)
 
             # H += calculate_pyqubo(model, images, labels)
             # if i%100 == 0:
             print(f"{i+1} / {len(dataloader)}")
-        return torch.stack(outputs), torch.stack(expecteds)
+        outputs, expecteds = torch.stack(outputs), torch.stack(expecteds)
+        return calculate_pyqubo(model, outputs, expecteds)
 
 
 def test(model, dataloader):
@@ -119,6 +121,7 @@ def test(model, dataloader):
             _, predicted = torch.max(y_pred, 1)
             total += y.size(0)
             running_accuracy += (predicted == y).sum().item()
+            print(running_accuracy/total)
         print('Accuracy of the model based on the test set of','all','inputs is: %d %%' % (100 * running_accuracy / total))
 
 
@@ -165,15 +168,9 @@ if __name__ == '__main__':
         param.requires_grad = False
 
     # train_loop(model, dataloaders['train'], optimizer, criterion, num_epochs, cutout=1500)
-    outputs, expecteds = anneal_loop(model, dataloaders['anneal'])
+    bqm = anneal_loop(model, dataloaders['anneal'])
+    sampleset = SimulatedAnnealingSampler().sample(bqm, num_reads=1000)
+    print(sampleset.first.sample.values())
+    model.fc.weight *= torch.tensor(list(sampleset.first.sample.values()))
 
-
-    # inputs, classes = next(iter(dataloaders['train']))
-    # summary(model)
-
-    # Make a grid from batch
-    # out = torchvision.utils.make_grid(inputs)
-
-    # imshow(out, title=[class_names[x] for x in classes])
-    # plt.show()
-
+    test(model, dataloaders['train'])
