@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pyqubo
 from dimod import BinaryQuadraticModel
-from dwave.system import DWaveSampler, EmbeddingComposite
+from dwave.system import DWaveSampler, EmbeddingComposite, LeapHybridBQMSampler
 from neal import SimulatedAnnealingSampler
 
 def imshow(inp, title=None):
@@ -64,6 +64,52 @@ def forward_no_fc(model, x):
     # x = model.fc(x)
 
     return x
+
+def calculate_qubo_matrix(model, outputs, expecteds):
+    """
+    Input: model and batch from dataloader.
+    Add result from all images and call .compile().
+    Make sure the last layer of the model is fully connected and named fc.
+
+    no bias for now
+
+    outputs: A
+    expecteds: Y'
+    model.fc.weights: W
+    """
+    W = model.fc.weight.detach().numpy()
+    A = outputs.detach().numpy()
+    Y = expecteds.detach().numpy()
+    # Q = torch.zeros(model.fc.in_features, model.fc.in_features)
+    print('zaczynam einsum')
+    Q = 2*np.einsum('di,ei,dj,ej->ij',W,A,W,A)/10
+    np.fill_diagonal(Q,0)
+    print('Calculating Q(i,i):')
+    for i in tqdm(range(W.shape[1])):
+        for e in range(A.shape[0]):
+            for d in range(W.shape[0]):
+                Q[i,i] += (W[d,i]*A[e,i])**2 - 2*W[d,i]*A[e,i]*Y[e,d]
+    np.fill_diagonal(Q,0)
+    print(Q)
+    print(Q.shape)
+
+    # ij = []
+    # for i in range(W.shape[1]):
+    #     for j in range(i, W.shape[1]):
+    #         ij.append((i,j))
+    # for i,j in tqdm(ij):
+    #     for e in range(A.shape[0]):
+    #         for d in range(W.shape[0]):
+    #             Q[i,j] += 2*W[d,i]*A[e,i]*W[d,j]*A[e,j]
+
+    #TODO: check if any one value is correct
+    # main_diagonal = (((outputs@weights.T) - 2*expecteds) @ weights).T @ outputs
+    #TODO: add values other than main diagonal
+    # Q += torch.eye(model.fc.in_features)*main_diagonal
+    # for i in range(len(weights)):
+    #     for j in range(i, len(weights)):
+    #         Q[i,j] = 2*weights[i,:]*outputs[:,i]*weights[j]*outputs[:,j]
+    return BinaryQuadraticModel(Q, "BINARY")
 
 
 def calculate_pyqubo(model, outputs, expecteds):
@@ -169,8 +215,10 @@ if __name__ == '__main__':
 
     # train_loop(model, dataloaders['train'], optimizer, criterion, num_epochs, cutout=1500)
     bqm = anneal_loop(model, dataloaders['anneal'])
+    print(bqm)
     sampleset = SimulatedAnnealingSampler().sample(bqm, num_reads=1000)
+    # sampleset = LeapHybridBQMSampler().sample(bqm, time_limit = 100)
     print(sampleset.first.sample.values())
     model.fc.weight *= torch.tensor(list(sampleset.first.sample.values()))
 
-    test(model, dataloaders['train'])
+    test(model, dataloaders['anneal'])
